@@ -17,7 +17,7 @@ async function main() {
 
 		appLogger.info('✅ Todos os serviços iniciados com sucesso!')
 		appLogger.info(
-			'💡 Usuários podem fazer login em: http://localhost:3000/login/discord',
+			'💡 Usuários podem fazer login em: http://localhost:8080/login/discord',
 		)
 		appLogger.info('🎯 Bot Discord está ouvindo mensagens...')
 

@@ -52,7 +52,7 @@ export class AuthService {
 	 * Gera o link de login com Discord
 	 */
 	static getLoginUrl(): string {
-		const baseUrl = process.env.BETTER_AUTH_URL || 'http://localhost:3000'
+		const baseUrl = process.env.BETTER_AUTH_URL || 'http://localhost:8080'
 		return `${baseUrl}/login/discord`
 	}
 

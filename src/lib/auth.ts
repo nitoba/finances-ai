@@ -34,7 +34,7 @@ export const auth = betterAuth({
 		session: {},
 	},
 
-	trustedOrigins: ['http://localhost:3000'],
+	trustedOrigins: ['http://localhost:8080'],
 })
 
 async function notifyUserLoginSuccess(userId: string) {

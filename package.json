@@ -5,8 +5,8 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "mastra dev",
-    "build": "mastra build",
-    "start": "mastra start",
+    "build": "tsc",
+    "start": "node dist/app.js",
     "discord-bot": "tsx src/discord-bot.ts",
     "discord-bot:dev": "tsx watch src/discord-bot.ts",
     "web-server": "tsx src/web-server.ts",

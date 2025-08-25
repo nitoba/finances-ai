@@ -1,0 +1,30 @@
+# Development files
+src/
+*.ts
+*.md
+.env
+.env.local
+.env.development
+.env.test
+
+# Build tools
+tsconfig.json
+biome.json
+
+# Dependencies
+node_modules/
+pnpm-lock.yaml
+
+# IDE and system files
+.vscode/
+.idea/
+.DS_Store
+*.log
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+README.md
+LICENSE
