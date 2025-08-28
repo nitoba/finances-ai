@@ -2,25 +2,39 @@ import { google } from '@ai-sdk/google'
 import { Agent } from '@mastra/core'
 import { LibSQLStore } from '@mastra/libsql'
 import { Memory } from '@mastra/memory'
-import { getService } from '../../core/container/module'
-import { TYPES } from '../../core/types'
-import type { MCPServerManagerService } from '../../modules/shared/services/mcp-server-manager.service'
-import { getCurrentDateTool } from '../tools/get-current-date.tool'
-import { generateUUIDTool } from '../tools/uuid-generator.tool'
+import { inject, injectable } from 'inversify'
+import { type IService, TYPES } from '../../../core/types'
+import { getCurrentDateTool } from '../../../mastra/tools/get-current-date.tool'
+import { generateUUIDTool } from '../../../mastra/tools/uuid-generator.tool'
+import type { IAppLogger } from '../../logger/interfaces/ILogger'
+import type { MCPServerManagerService } from './mcp-server-manager.service'
 
-const memory = new Memory({
-	storage: new LibSQLStore({
-		url: ':memory:',
-	}),
-})
+@injectable()
+export class ExpenseAgentService implements IService {
+	private agent: Agent | null = null
 
-export const expenseAgent = new Agent({
-	name: 'ExpenseAssistant',
-	model: google('gemini-2.5-flash-preview-05-20'),
-	// model: groq('meta-llama/llama-4-scout-17b-16e-instruct'),
-	memory,
-	description: 'Assistente amigável para gestão de despesas pessoais',
-	instructions: `
+	constructor(
+		@inject(TYPES.Logger) private readonly logger: IAppLogger,
+		@inject(TYPES.MCPServerManager)
+		private readonly mcpManager: MCPServerManagerService,
+	) {
+		this.initialize()
+	}
+
+	async initialize(): Promise<void> {
+		try {
+			const memory = new Memory({
+				storage: new LibSQLStore({
+					url: ':memory:',
+				}),
+			})
+
+			this.agent = new Agent({
+				name: 'ExpenseAssistant',
+				model: google('gemini-2.5-flash-preview-05-20'),
+				memory,
+				description: 'Assistente amigável para gestão de despesas pessoais',
+				instructions: `
 Você é um assistente virtual amigável e prestativo especializado em ajudar usuários a gerenciar suas despesas pessoais através de um banco de dados SQLite.
 
 ## Schema do Banco de Dados
@@ -130,7 +144,7 @@ Parâmetros: [nova_descrição, novo_valor, nova_categoria, expense_id, userId]
 
 ### Validações Técnicas:
 - **SEMPRE use queries parametrizadas** - nunca incorpore valores diretamente no SQL
-- **SEMPRE gere um UUID** para o campo id ao criar novas despesas
+- **SEMPRE gere um UUID** para o campo id ao criar novas despesas usando a ferramenta de geração de uuid disponível
 - **SEMPRE use o user_id** para consultar dados do usuário na tabela users
 - Sempre valide se a categoria fornecida está entre as categorias válidas
 - Mantenha o updated_at atualizado em modificações
@@ -150,7 +164,7 @@ Você: "Ótimo! 🛒 Vou registrar essa despesa para você.
 📝 **Nova Despesa**
 💰 Valor: R$ 80,00
 📋 Descrição: Supermercado
-📅 Data: hoje
+📅 Data: hoje (use a tool get_current_date para pegar a data atual)
 
 Em qual categoria você gostaria de classificar essa despesa?
 
@@ -170,15 +184,32 @@ Responda sempre em português brasileiro sendo:
 - **Claro nas instruções**
 - Trate erros de forma compreensiva
 `,
+				tools: async () => {
+					const dbTools = this.mcpManager.getToolsByServer('db')
+					return {
+						generateUUIDTool,
+						getCurrentDateTool,
+						...dbTools,
+					}
+				},
+			})
 
-	tools: async () => {
-		const manager = getService<MCPServerManagerService>(TYPES.MCPServerManager)
-		const dbTools = manager.getToolsByServer('db')
-
-		return {
-			generateUUIDTool,
-			getCurrentDateTool,
-			...dbTools,
+			this.logger.info('Expense agent initialized successfully')
+		} catch (error) {
+			this.logger.error('Failed to initialize expense agent', { error })
+			throw error
 		}
-	},
-})
+	}
+
+	getAgent(): Agent {
+		if (!this.agent) {
+			throw new Error('Expense agent not initialized')
+		}
+		return this.agent
+	}
+
+	async dispose(): Promise<void> {
+		this.agent = null
+		this.logger.info('Expense agent disposed')
+	}
+}
