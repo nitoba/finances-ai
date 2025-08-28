@@ -1,11 +1,11 @@
 {
   "name": "finances-ai",
   "version": "1.0.0",
-  "main": "index.js",
+  "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "mastra dev",
-    "build": "tsc",
+    "build": "tsup",
     "start": "node dist/app.js",
     "app:dev": "tsx watch src/app.ts"
   },
@@ -13,7 +13,6 @@
   "author": "",
   "license": "ISC",
   "description": "",
-  "type": "module",
   "engines": {
     "node": ">=20.9.0"
   },
@@ -51,6 +50,7 @@
     "@types/reflect-metadata": "^0.1.0",
     "drizzle-kit": "^0.31.4",
     "mastra": "^0.10.23",
+    "tsup": "^8.5.0",
     "tsx": "^4.20.5",
     "typescript": "^5.9.2"
   }

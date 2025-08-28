@@ -12,7 +12,8 @@ export namespace interfaces {
 	export type Newable<T = unknown> = new (...args: any[]) => T
 }
 
-export const diContainer = new Container()
+// Initialize container globally and ensure it's ready
+export const diContainer = new Container({ defaultScope: 'Singleton' })
 
 export type ProviderWithConfig = {
 	provide: interfaces.ServiceIdentifier
