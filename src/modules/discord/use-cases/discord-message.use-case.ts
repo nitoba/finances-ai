@@ -1,5 +1,4 @@
 import { inject, injectable } from 'inversify'
-import { AppError } from '../../../core/errors/AppError'
 import { TYPES } from '../../../core/types'
 import type { AuthService } from '../../auth/services/auth.service'
 import type { IAppLogger } from '../../logger/interfaces/ILogger'
@@ -47,24 +46,11 @@ export class DiscordMessageUseCase implements IDiscordMessageUseCase {
 
 			const { userId, userName } = authCheck
 
-			// Process the message with authenticated user context
-			const result = await this.messageProcessingService.processTextMessage(
+			// Stream the message processing with authenticated user context
+			await this.messageProcessingService.streamTextMessage(
 				input,
 				userId!,
 				userName!,
-			)
-
-			if (!result.isSuccess) {
-				throw new AppError(
-					'MESSAGE_PROCESSING_FAILED',
-					result.error ?? 'Falha no processamento da mensagem',
-					500,
-				)
-			}
-
-			await this.messageProcessingService.sendDirectMessage(
-				input.message,
-				result.response,
 			)
 
 			this.logger.info('Text message handled successfully', {
@@ -120,30 +106,12 @@ export class DiscordMessageUseCase implements IDiscordMessageUseCase {
 				return
 			}
 
-			console.log(authCheck)
-
-			// Process transcription with expense agent
-			const messageResult =
-				await this.messageProcessingService.processAudioTranscription(
-					audioResult.transcription,
-					authCheck.userId!,
-					authCheck.userName!,
-				)
-
-			if (!messageResult.isSuccess) {
-				throw new AppError(
-					'AUDIO_MESSAGE_PROCESSING_FAILED',
-					messageResult.error ?? 'Falha no processamento da transcrição',
-					500,
-				)
-			}
-
-			// Send response with transcription context
-			const fullReply = `🎤 **Você disse:** "${audioResult.transcription}"\n\n${messageResult.response}`
-
-			await this.messageProcessingService.sendDirectMessage(
+			// Stream transcription processing with expense agent
+			await this.messageProcessingService.streamAudioTranscription(
+				audioResult.transcription,
+				authCheck.userId!,
+				authCheck.userName!,
 				input.message,
-				fullReply,
 			)
 
 			await input.message.react('✅')

@@ -40,6 +40,17 @@ export interface IMessageProcessingService {
 		userId: string,
 		userName: string,
 	): Promise<MessageProcessingResult>
+	streamTextMessage(
+		input: ProcessMessageInput,
+		userId: string,
+		userName: string,
+	): Promise<void>
+	streamAudioTranscription(
+		transcription: string,
+		userId: string,
+		userName: string,
+		message: OmitPartialGroupDMChannel<Message>,
+	): Promise<void>
 	sendDirectMessage(
 		message: OmitPartialGroupDMChannel<Message>,
 		content: string,
