@@ -63,8 +63,8 @@ export class MCPServerManagerService implements IService {
 
 			// MySQL sempre necessário
 			serversConfig.db = {
-				command: 'pnpm',
-				args: ['exec', 'mcp-libsql', '--url', env.DATABASE_URL],
+				command: 'npx',
+				args: ['mcp-libsql', '--url', env.DATABASE_URL],
 				env: {
 					LIBSQL_AUTH_TOKEN: env.DATABASE_AUTH_TOKEN,
 				},
