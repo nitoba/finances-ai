@@ -149,7 +149,7 @@ export class MessageProcessingService implements IMessageProcessingService {
 			})
 
 			const agent = this.expenseAgent.getAgent()
-			const stream = await agent.stream([
+			const stream = await agent.streamVNext([
 				{
 					role: 'system',
 					content: `Você responde a esse usuário: 
