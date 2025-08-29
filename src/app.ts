@@ -1,4 +1,5 @@
 import 'reflect-metadata'
+import { and, eq } from 'drizzle-orm'
 import { getService } from './core/container/module'
 import { TYPES } from './core/types'
 import { AppModule } from './modules/app.module'
@@ -6,9 +7,12 @@ import { auth } from './modules/auth/infra/better-auth/auth'
 import type { DiscordBotHandlerService } from './modules/discord/services/discord-bot-handler.service'
 import { env } from './modules/env'
 import type { IAppLogger } from './modules/logger/interfaces/ILogger'
+import { db } from './modules/shared/persistence/db'
+import { accounts, sessions } from './modules/shared/persistence/schemas'
 import type { DatabaseService } from './modules/shared/persistence/services/database.service'
 import type { HttpServer } from './modules/shared/services/http-server'
 import type { MCPServerManagerService } from './modules/shared/services/mcp-server-manager.service'
+import type { NotificationService } from './modules/shared/services/notification.service'
 
 // Initialize the AppModule to register all dependencies
 new AppModule()
@@ -135,7 +139,7 @@ function setupHttpRoutes(httpServer: HttpServer, logger: IAppLogger): void {
 		try {
 			// Use better-auth's signInSocial API
 			const callbackURL = `${request.protocol}://${request.headers.host}/login-success`
-			console.log(callbackURL)
+
 			const result = await auth.api.signInSocial({
 				body: {
 					provider: 'discord',
@@ -143,15 +147,10 @@ function setupHttpRoutes(httpServer: HttpServer, logger: IAppLogger): void {
 					callbackURL: callbackURL,
 				},
 			})
-
 			// Redirect to Discord OAuth
 			if (result.url) {
 				return reply.redirect(result.url)
 			}
-
-			return reply.status(400).send({
-				error: 'Failed to initiate Discord login',
-			})
 		} catch (error) {
 			const err = error instanceof Error ? error.message : JSON.stringify(error)
 			logger.error(`Discord Login Error: ${err}`)
@@ -161,7 +160,126 @@ function setupHttpRoutes(httpServer: HttpServer, logger: IAppLogger): void {
 		}
 	})
 
-	httpServer.getApp().get('/login-success', async (_, reply) => {
+	httpServer.getApp().get('/logout/discord', async (request, reply) => {
+		try {
+			const noficiationService = getService<NotificationService>(
+				TYPES.NotificationService,
+			)
+
+			const headers = new Headers()
+			Object.entries(request.headers).forEach(([key, value]) => {
+				if (value) {
+					// Handle array of values
+					if (Array.isArray(value)) {
+						headers.append(key, value.join(', '))
+					} else {
+						headers.append(key, value.toString())
+					}
+				}
+			})
+
+			const session = await auth.api.getSession({ headers: headers })
+
+			if (!session) {
+				return reply.status(404).send({ error: 'Erro ao fazer o logout' })
+			}
+
+			const { status } = await auth.api.revokeSession({
+				headers: headers,
+				body: { token: session?.session.token },
+			})
+
+			if (status) {
+				await noficiationService.notifyUserLogoutSuccess(session?.user.id)
+				return reply.type('text/html').send(`
+					<!DOCTYPE html>
+					<html>
+						<head>
+							<meta charset="UTF-8">
+							<title>Logout - Finances[AI]</title>
+							<style>
+								body {
+									font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+									background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+									margin: 0;
+									padding: 0;
+									display: flex;
+									justify-content: center;
+									align-items: center;
+									height: 100vh;
+								}
+								.container {
+									background: white;
+									padding: 40px;
+									border-radius: 12px;
+									box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+									text-align: center;
+									max-width: 400px;
+									width: 90%;
+								}
+								h1 {
+									color: #333;
+									margin-bottom: 20px;
+									font-size: 24px;
+								}
+								p {
+									color: #666;
+									line-height: 1.5;
+									margin-bottom: 20px;
+								}
+								.icon {
+									font-size: 48px;
+									margin-bottom: 20px;
+								}
+								.countdown {
+									font-weight: bold;
+									color: #667eea;
+								}
+							</style>
+						</head>
+						<body>
+							<div class="container">
+								<div class="icon">👋</div>
+								<h1>Logout realizado com sucesso!</h1>
+								<p>Sua sessão foi encerrada com segurança.</p>
+								<p>Esta página será fechada em <span class="countdown" id="countdown">3</span> segundos...</p>
+							</div>
+							<script>
+								let count = 3;
+								const countdown = document.getElementById('countdown');
+								const interval = setInterval(() => {
+									count--;
+									countdown.textContent = count;
+									if (count <= 0) {
+										clearInterval(interval);
+										// Tenta fechar a janela, mas se não conseguir, mostra mensagem
+										if (!window.close()) {
+											document.querySelector('.container').innerHTML = \`
+												<div class="icon">✅</div>
+												<h1>Logout concluído!</h1>
+												<p>Você pode fechar esta aba manualmente.</p>
+											\`;
+										}
+									}
+								}, 1000);
+							</script>
+						</body>
+					</html>
+				`)
+			}
+
+			return reply.status(400).send({ error: 'Erro ao fazer o logout' })
+		} catch (error) {
+			const err = error instanceof Error ? error.message : JSON.stringify(error)
+			logger.error(`Discord Login Error: ${err}`)
+			return reply.status(500).send({
+				error: 'Internal login error',
+			})
+		}
+	})
+
+	httpServer.getApp().get('/login-success', async (req, reply) => {
+		const sessionToken = req.cookies['finances[ai].session_token']
 		const page = `
 <!DOCTYPE html>
 <html>
@@ -186,6 +304,10 @@ function setupHttpRoutes(httpServer: HttpServer, logger: IAppLogger): void {
 		h1 { color: #4CAF50; }
 		p { color: #666; font-size: 18px; }
 		.discord { color: #5865F2; font-weight: bold; }
+		.countdown {
+			font-weight: bold;
+			color: #667eea;
+		}
 	</style>
 </head>
 <body>
@@ -194,10 +316,56 @@ function setupHttpRoutes(httpServer: HttpServer, logger: IAppLogger): void {
 		<p>Sua conta Discord foi conectada com sucesso.</p>
 		<p>Agora você pode voltar para o <span class="discord">Discord</span> e conversar com o bot!</p>
 		<p><strong>Pode fechar esta página.</strong></p>
+		<p>Esta página será fechada em <span class="countdown" id="countdown">3</span> segundos...</p>
 	</div>
+
+	<script>
+		let count = 3;
+		const countdown = document.getElementById('countdown');
+		const interval = setInterval(() => {
+			count--;
+			countdown.textContent = count;
+			if (count <= 0) {
+				clearInterval(interval);
+				// Tenta fechar a janela, mas se não conseguir, mostra mensagem
+				if (!window.close()) {
+					document.querySelector('.container').innerHTML = \`
+						<div class="icon">✅</div>
+						<h1>Login concluído!</h1>
+						<p>Você pode fechar esta aba manualmente.</p>
+					\`;
+				}
+			}
+		}, 1000);
+	</script>
 </body>
 </html>
 	`.trim()
+
+		if (sessionToken) {
+			const noficiationService = getService<NotificationService>(
+				TYPES.NotificationService,
+			)
+
+			const headers = new Headers()
+			Object.entries(req.headers).forEach(([key, value]) => {
+				if (value) {
+					// Handle array of values
+					if (Array.isArray(value)) {
+						headers.append(key, value.join(', '))
+					} else {
+						headers.append(key, value.toString())
+					}
+				}
+			})
+
+			const session = await auth.api.getSession({ headers: headers })
+
+			if (session) {
+				await noficiationService.notifyUserLoginSuccess(session?.user.id)
+			}
+		}
+
 		return reply.type('text/html').send(page)
 	})
 

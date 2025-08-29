@@ -1,3 +1,4 @@
+import cookie from '@fastify/cookie'
 import cors from '@fastify/cors'
 import fastify, { type FastifyInstance } from 'fastify'
 import { inject, injectable } from 'inversify'
@@ -27,6 +28,8 @@ export class HttpServer {
 			credentials: true,
 			origin: true,
 		})
+
+		this.app.register(cookie, { hook: 'onRequest' })
 
 		// Request logging middleware
 		this.app.addHook('onRequest', (request, _, done) => {

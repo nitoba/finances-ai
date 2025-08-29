@@ -11,6 +11,10 @@ export const auth = betterAuth({
 		provider: 'sqlite',
 		usePlural: true,
 	}),
+	appName: 'Finances[AI]',
+	advanced: {
+		cookiePrefix: 'finances[ai]',
+	},
 	socialProviders: {
 		discord: {
 			clientId: env.DISCORD_CLIENT_ID,

@@ -1,7 +1,14 @@
+import type { Agent } from '@mastra/core'
 import { stepCountIs } from 'ai'
-import type { Message, OmitPartialGroupDMChannel } from 'discord.js'
+import {
+	type ColorResolvable,
+	EmbedBuilder,
+	type Message,
+	type OmitPartialGroupDMChannel,
+} from 'discord.js'
 import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../core/types'
+import type { SendDMEmbedToolResult } from '../../../mastra/tools/send-dm-embed.tool'
 import type { IAppLogger } from '../../logger/interfaces/ILogger'
 import type { ExpenseAgentService } from '../../shared/services/expense-agent.service'
 import type {
@@ -149,7 +156,7 @@ export class MessageProcessingService implements IMessageProcessingService {
 			})
 
 			const agent = this.expenseAgent.getAgent()
-			const stream = await agent.streamVNext([
+			const response = await agent.generateVNext([
 				{
 					role: 'system',
 					content: `Você responde a esse usuário: 
@@ -168,27 +175,41 @@ export class MessageProcessingService implements IMessageProcessingService {
 				input.message,
 				'💬 _Processando..._',
 			)
-			let accumulatedText = ''
-			let lastUpdateTime = Date.now()
-			const UPDATE_INTERVAL = 50 // Update every 2 seconds
+			// let accumulatedText = ''
+			// let lastUpdateTime = Date.now()
+			// const UPDATE_INTERVAL = 50 // Update every 2 seconds
 
 			// Stream the response
-			for await (const chunk of stream.textStream) {
-				accumulatedText += chunk
-				await this.updateDiscordMessage(initialMessage, accumulatedText)
+			// for await (const chunk of stream.textStream) {
+			// 	accumulatedText += chunk
+			// 	await this.updateDiscordMessage(initialMessage, accumulatedText)
 
-				// Update Discord message every 2 seconds to avoid rate limits
-				const now = Date.now()
-				if (now - lastUpdateTime > UPDATE_INTERVAL && accumulatedText.trim()) {
-					lastUpdateTime = now
-				}
-			}
+			// 	// Update Discord message every 2 seconds to avoid rate limits
+			// 	const now = Date.now()
+			// 	if (now - lastUpdateTime > UPDATE_INTERVAL && accumulatedText.trim()) {
+			// 		lastUpdateTime = now
+			// 	}
+			// }
 
-			// Final update with complete text
+			// Final update with complete text - check for embed
 			const finalText =
-				accumulatedText.trim() ||
+				response.text.trim() ||
 				'Desculpe, não consegui processar sua solicitação.'
-			await this.updateDiscordMessage(initialMessage, finalText)
+
+			// Check if agent wants to use embed
+			const { embedData, cleanText } = this.tryParseEmbedFromResponse(response)
+
+			if (embedData) {
+				// Send as embed
+				const embed = this.createDiscordEmbed(embedData)
+				await initialMessage.edit({
+					content: cleanText || '',
+					embeds: [embed],
+				})
+			} else {
+				// Send as regular text
+				await this.updateDiscordMessage(initialMessage, finalText)
+			}
 
 			this.logger.info('Text message streaming successful', {
 				messageId: input.message.id,
@@ -221,7 +242,7 @@ export class MessageProcessingService implements IMessageProcessingService {
 			})
 
 			const agent = this.expenseAgent.getAgent()
-			const stream = await agent.streamVNext(
+			const response = await agent.generateVNext(
 				[
 					{
 						role: 'system',
@@ -251,29 +272,44 @@ export class MessageProcessingService implements IMessageProcessingService {
 				transcriptionHeader,
 			)
 
-			let accumulatedText = ''
-			let lastUpdateTime = Date.now()
-			const UPDATE_INTERVAL = 2000 // Update every 2 seconds
+			// let accumulatedText = ''
+			// let lastUpdateTime = Date.now()
+			// const UPDATE_INTERVAL = 2000 // Update every 2 seconds
 
 			// Stream the response
-			for await (const chunk of stream.textStream) {
-				accumulatedText += chunk
+			// for await (const chunk of stream.textStream) {
+			// 	accumulatedText += chunk
 
-				// Update Discord message every 2 seconds to avoid rate limits
-				const now = Date.now()
-				if (now - lastUpdateTime > UPDATE_INTERVAL && accumulatedText.trim()) {
-					const fullResponse = `🎤 **Você disse:** "${transcription}"\n\n${accumulatedText}`
-					await this.updateDiscordMessage(initialMessage, fullResponse)
-					lastUpdateTime = now
-				}
-			}
+			// 	// Update Discord message every 2 seconds to avoid rate limits
+			// 	const now = Date.now()
+			// 	if (now - lastUpdateTime > UPDATE_INTERVAL && accumulatedText.trim()) {
+			// 		const fullResponse = `🎤 **Você disse:** "${transcription}"\n\n${accumulatedText}`
+			// 		await this.updateDiscordMessage(initialMessage, fullResponse)
+			// 		lastUpdateTime = now
+			// 	}
+			// }
 
-			// Final update with complete text
+			// Final update with complete text - check for embed
 			const finalText =
-				accumulatedText.trim() ||
+				response.text.trim() ||
 				'Desculpe, não consegui processar sua solicitação.'
-			const fullFinalResponse = `🎤 **Você disse:** "${transcription}"\n\n${finalText}`
-			await this.updateDiscordMessage(initialMessage, fullFinalResponse)
+
+			// Check if agent wants to use embed
+			const { embedData, cleanText } = this.tryParseEmbedFromResponse(response)
+
+			if (embedData) {
+				// Send as embed with transcription header
+				const embed = this.createDiscordEmbed(embedData)
+				const headerMessage = `🎤 **Você disse:** "${transcription}"\n\n${cleanText || ''}`
+				await initialMessage.edit({
+					content: headerMessage,
+					embeds: [embed],
+				})
+			} else {
+				// Send as regular text
+				const fullFinalResponse = `🎤 **Você disse:** "${transcription}"\n\n${finalText}`
+				await this.updateDiscordMessage(initialMessage, fullFinalResponse)
+			}
 
 			this.logger.info('Audio transcription streaming successful', {
 				responseLength: finalText.length,
@@ -371,5 +407,58 @@ export class MessageProcessingService implements IMessageProcessingService {
 				error: error instanceof Error ? error.message : String(error),
 			})
 		}
+	}
+
+	private tryParseEmbedFromResponse(
+		response: Awaited<ReturnType<Agent['generateVNext']>>,
+	): {
+		embedData?: SendDMEmbedToolResult['embedData']
+		cleanText: string
+	} {
+		try {
+			// Verificar se existe informação de embed nos tool calls
+			if (response.steps && Array.isArray(response.steps)) {
+				for (const step of response.steps) {
+					if (step.toolCalls && Array.isArray(step.toolCalls)) {
+						for (const toolCall of step.toolCalls) {
+							if (
+								toolCall.toolName === 'send_dm_embed' &&
+								toolCall.result?.useEmbed
+							) {
+								return {
+									embedData: toolCall.result.embedData,
+									cleanText: response.text || '',
+								}
+							}
+						}
+					}
+				}
+			}
+
+			return { cleanText: response.text || '' }
+		} catch (error) {
+			this.logger.warn('Error parsing embed from response', { error })
+			return { cleanText: response.text || '' }
+		}
+	}
+
+	private createDiscordEmbed(
+		embedData: SendDMEmbedToolResult['embedData'],
+	): EmbedBuilder {
+		const embed = new EmbedBuilder()
+			.setTitle(embedData.title)
+			.setDescription(embedData.description)
+			.setColor((embedData.color as ColorResolvable) || '#00D4AA')
+			.setTimestamp()
+
+		if (embedData.fields && Array.isArray(embedData.fields)) {
+			embed.addFields(embedData.fields)
+		}
+
+		if (embedData.footer) {
+			embed.setFooter({ text: embedData.footer })
+		}
+
+		return embed
 	}
 }

@@ -6,6 +6,7 @@ import { getService } from '../../core/container/module'
 import { TYPES } from '../../core/types'
 import type { MCPServerManagerService } from '../../modules/shared/services/mcp-server-manager.service'
 import { getCurrentDateTool } from '../tools/get-current-date.tool'
+import { sendDMEmbedTool } from '../tools/send-dm-embed.tool'
 import { generateUUIDTool } from '../tools/uuid-generator.tool'
 
 const memory = new Memory({
@@ -169,6 +170,36 @@ Responda sempre em português brasileiro sendo:
 - **Amigável e prestativo**
 - **Claro nas instruções**
 - Trate erros de forma compreensiva
+
+### Quando usar Embeds (MUITO IMPORTANTE!)
+
+Use a ferramenta **send_dm_embed** quando:
+
+1. **Listar despesas** - sempre use embed para mostrar listas de gastos
+2. **Mostrar relatórios** - totais por categoria, resumos mensais
+3. **Confirmar operações** - quando adicionar/editar/remover despesas  
+4. **Apresentar estatísticas** - gastos vs salário, médias, etc.
+
+**SEMPRE prefira embeds para apresentar dados estruturados!**
+
+#### Exemplos de quando usar embeds:
+
+📋 **Lista de Despesas:**
+- Título: "💰 Suas Despesas de Janeiro 2024"
+- Campos: "🏠 Supermercado" → "R$ 120,00 • 15/01/2024"
+- Footer: "Total: R$ 165,00"
+
+📊 **Relatório por Categoria:**
+- Título: "📊 Gastos por Categoria"  
+- Campos: "🏠 Essenciais" → "R$ 1.200,00 (60%)"
+- Footer: "Total gasto: R$ 2.000,00"
+
+✅ **Confirmação:**
+- Título: "✅ Despesa Adicionada!"
+- Descrição: "Sua despesa foi registrada com sucesso"
+- Campos: "📋 Descrição" → "Supermercado", "💰 Valor" → "R$ 80,00"
+
+**Use texto simples apenas para perguntas, conversas casuais e coleta de informações.**
 `,
 
 	tools: async () => {
@@ -178,6 +209,7 @@ Responda sempre em português brasileiro sendo:
 		return {
 			generateUUIDTool,
 			getCurrentDateTool,
+			sendDMEmbedTool,
 			...dbTools,
 		}
 	},

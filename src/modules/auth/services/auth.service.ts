@@ -21,9 +21,9 @@ export class AuthService {
 
 	async checkAuthAndGetMessage(discordId: string): Promise<AuthCheckResult> {
 		try {
-			const user = await this.authRepository.findUserByDiscordId(discordId)
+			const session = await this.authRepository.getUserSession(discordId)
 
-			if (!user) {
+			if (!session) {
 				return {
 					isAuthenticated: false,
 					message: `🔐 **Você precisa fazer login primeiro!**
@@ -37,9 +37,9 @@ Após o login, volte aqui e envie seu comando novamente.`,
 
 			return {
 				isAuthenticated: true,
-				userId: user.id,
-				userName: user.name || 'Usuário',
-				message: `✅ Autenticado como ${user.name || 'Usuário'}`,
+				userId: session.userId,
+				userName: session.userName || 'Usuário',
+				message: `✅ Autenticado como ${session.userName || 'Usuário'}`,
 			}
 		} catch (error) {
 			this.logger.error('Auth check failed', { discordId, error })

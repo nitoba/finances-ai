@@ -8,4 +8,4 @@ const turso = createClient({
 	authToken: env.DATABASE_AUTH_TOKEN,
 })
 
-export const db = drizzle(turso, { schema })
+export const db = drizzle(turso, { schema, logger: true })

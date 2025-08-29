@@ -188,19 +188,21 @@ export class CommandHandlerService implements IService {
 
 			const baseUrl = process.env.BETTER_AUTH_URL || 'http://localhost:3333'
 
+			const logoutUrl = `${baseUrl}/logout/discord`
+
 			const embed = new EmbedBuilder()
 				.setColor('#FF6B6B')
 				.setTitle('🚪 Logout')
 				.setDescription(
-					'Para fazer logout, acesse o painel web e desconecte sua conta.\n\nClique no botão abaixo para acessar o painel.',
+					'Para fazer logout, acesse o link desconecte sua conta.\n\nClique no botão abaixo.',
 				)
 				.setFooter({ text: 'Finances[AI] Bot' })
 				.setTimestamp()
 
 			const logoutButton = new ButtonBuilder()
-				.setLabel('🌐 Acessar Painel Web')
+				.setLabel('Clique aqui para realizar o logout')
 				.setStyle(ButtonStyle.Link)
-				.setURL(baseUrl)
+				.setURL(logoutUrl)
 
 			const row = new ActionRowBuilder<ButtonBuilder>().addComponents(
 				logoutButton,

@@ -20,11 +20,6 @@ import { SharedModule } from './shared/shared.module'
 	],
 	providers: [
 		{ provide: TYPES.HttpServer, useClass: HttpServer, scope: 'singleton' },
-		{
-			provide: TYPES.NotificationService,
-			useClass: NotificationService,
-			scope: 'singleton',
-		},
 		HttpServer,
 		NotificationService,
 	],

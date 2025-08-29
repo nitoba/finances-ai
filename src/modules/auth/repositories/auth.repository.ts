@@ -3,9 +3,14 @@ import { inject, injectable } from 'inversify'
 import { TYPES } from '../../../core/types'
 import type { IAppLogger } from '../../logger/interfaces/ILogger'
 import { DrizzleDefaultRepository } from '../../shared/persistence/repository/drizzle-default-repository'
-import { accounts, users } from '../../shared/persistence/schemas/auth-schema'
+import {
+	accounts,
+	sessions,
+	users,
+} from '../../shared/persistence/schemas/auth-schema'
 import type { DatabaseService } from '../../shared/persistence/services/database.service'
 import type { TransactionScope } from '../../shared/persistence/types/unit-of-work.types'
+import { auth } from '../infra/better-auth/auth'
 import { User } from '../models/user.model'
 
 @injectable()
@@ -24,6 +29,27 @@ export class AuthRepository extends DrizzleDefaultRepository<
 		@inject(TYPES.Logger) private readonly logger: IAppLogger,
 	) {
 		super(database.getConnection(), users)
+	}
+
+	async getUserSession(discordId: string) {
+		const [session] = await this.db
+			.select({
+				userId: users.id,
+				userName: users.name,
+				sessionToken: sessions.token,
+			})
+			.from(sessions)
+			.innerJoin(accounts, eq(sessions.userId, accounts.userId))
+			.innerJoin(users, eq(sessions.userId, users.id))
+			.where(
+				and(
+					eq(accounts.providerId, 'discord'),
+					eq(accounts.accountId, discordId),
+					eq(sessions.userId, accounts.userId),
+				),
+			)
+
+		return session
 	}
 
 	async findUserByDiscordId(
