@@ -4,10 +4,11 @@
   "main": "app.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dev": "mastra dev",
     "build": "tsup",
     "start": "node dist/app.js",
-    "app:dev": "tsx watch src/app.ts"
+    "dev": "tsx watch src/app.ts",
+    "commands:add": "tsx --env-file .env src/scripts/register-commands.ts",
+    "commands:remove": "tsx --env-file .env src/scripts/delete-all-commands.ts"
   },
   "keywords": [],
   "author": "",

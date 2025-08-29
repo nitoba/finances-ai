@@ -34,7 +34,7 @@ export class ExpenseRepository extends DrizzleDefaultRepository<
 	}
 
 	protected mapToModel(data: InferSelectModel<typeof expenses>): Expense {
-		throw Expense.createFrom(data)
+		return Expense.createFrom(data)
 	}
 
 	// Métodos específicos do ExpenseRepository

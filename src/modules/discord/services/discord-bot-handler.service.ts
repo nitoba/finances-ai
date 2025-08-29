@@ -1,10 +1,16 @@
-import type { Message, OmitPartialGroupDMChannel } from 'discord.js'
+import {
+	type ChatInputCommandInteraction,
+	type Message,
+	MessageFlags,
+	type OmitPartialGroupDMChannel,
+} from 'discord.js'
 import { inject, injectable } from 'inversify'
 import { type IService, TYPES } from '../../../core/types'
 import type { IAppLogger } from '../../logger/interfaces/ILogger'
 import type { DiscordClientService } from '../../shared/services/discord-client.service'
 import type { DiscordMessageUseCase } from '../use-cases/discord-message.use-case'
 import type { AudioProcessingService } from './audio-processing.service'
+import type { CommandHandlerService } from './command-handler.service'
 
 @injectable()
 export class DiscordBotHandlerService implements IService {
@@ -16,6 +22,8 @@ export class DiscordBotHandlerService implements IService {
 		private readonly audioProcessingService: AudioProcessingService,
 		@inject(TYPES.DiscordMessageUseCase)
 		private readonly messageUseCase: DiscordMessageUseCase,
+		@inject(TYPES.CommandHandlerService)
+		private readonly commandHandler: CommandHandlerService,
 	) {}
 
 	async initialize(): Promise<void> {
@@ -29,6 +37,11 @@ export class DiscordBotHandlerService implements IService {
 
 		client.on('messageCreate', async (message) => {
 			await this.handleMessage(message)
+		})
+
+		client.on('interactionCreate', async (interaction) => {
+			if (!interaction.isChatInputCommand()) return
+			await this.handleSlashCommand(interaction)
 		})
 	}
 
@@ -77,9 +90,37 @@ export class DiscordBotHandlerService implements IService {
 
 			// Handle text messages
 			if (message.content.trim()) {
+				const content = message.content.trim()
+
+				// Check if it's a command first
+				if (this.commandHandler.isCommand(content)) {
+					const { command, args } = this.commandHandler.parseCommand(content)
+					const result = await this.commandHandler.handleTextCommand(
+						message,
+						command,
+						args,
+					)
+
+					const replyOptions: any = {}
+
+					if (result.embed) {
+						replyOptions.embeds = [result.embed]
+					}
+					if (result.message) {
+						replyOptions.content = result.message
+					}
+					if (result.components) {
+						replyOptions.components = result.components
+					}
+
+					await message.reply(replyOptions)
+					return
+				}
+
+				// Otherwise, handle as regular AI message
 				await this.messageUseCase.handleTextMessage({
 					message,
-					content: message.content.trim(),
+					content,
 				})
 			}
 		} catch (error) {
@@ -101,6 +142,28 @@ export class DiscordBotHandlerService implements IService {
 						replyError instanceof Error
 							? replyError.message
 							: String(replyError),
+				})
+			}
+		}
+	}
+
+	private async handleSlashCommand(
+		interaction: ChatInputCommandInteraction,
+	): Promise<void> {
+		try {
+			await this.commandHandler.handleSlashCommand(interaction)
+		} catch (error) {
+			this.logger.error('Failed to handle slash command', {
+				commandName: interaction.commandName,
+				userId: interaction.user.id,
+				error: error instanceof Error ? error.message : String(error),
+			})
+
+			if (!interaction.replied) {
+				await interaction.reply({
+					content:
+						'❌ Ocorreu um erro ao processar o comando. Tente novamente.',
+					flags: MessageFlags.Ephemeral,
 				})
 			}
 		}

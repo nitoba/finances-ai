@@ -135,9 +135,6 @@ export class ExpenseUseCase {
 		input: GetExpensesInput,
 	): Promise<ExpenseUseCaseResult<Expense[]>> {
 		try {
-			// Validate user exists
-			await this.authService.getUserById(input.userId)
-
 			const expenses = await this.expenseRepository.findByUserId(
 				input.userId,
 				input.filters,

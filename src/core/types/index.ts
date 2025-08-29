@@ -26,6 +26,7 @@ export const TYPES = {
 	MessageProcessingService: Symbol.for('MessageProcessingService'),
 	AudioProcessingService: Symbol.for('AudioProcessingService'),
 	DiscordMessageUseCase: Symbol.for('DiscordMessageUseCase'),
+	CommandHandlerService: Symbol.for('CommandHandlerService'),
 
 	// HTTP services
 	HttpServer: Symbol.for('HttpServer'),
